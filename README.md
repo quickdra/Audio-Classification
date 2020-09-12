@@ -1,2 +1,2 @@
 # Audio-Classification
-Basic audio classification of cats and dogs
+Using deep learning to classify monophonic and polyphonic sound events
