@@ -23,10 +23,19 @@ file_names = file_names.fillna(0) # A few columns had null values
 #Also adds white noise to every window as data augmentation which doubles the dataset
 #Other augmentations such as slowing down or fastening the audio were tried but the performance deteroitated
 #Returns features for every window and label
+#The windows are appended to a file, this is done because as numpy concatenate gets temporally exhausting as large arrays are to be concatenated
 def create_features(file_names, file_path):
   flag = 0
   columns = ['train_cat', 'train_dog']
+  w = tables.open_file('window.h5','w')
+  atom1 = tables.Float32Atom()
+  array_w = w.create_earray(w.root, 'data', atom1, (0,20))
+  l = tables.open_file('label.h5','w')
+  atom2 = tables.Float32Atom()
+  array_l = l.create_earray(l.root, 'data', atom2, (0,1))
+  temp = []
   for col in columns:
+    count = 0
     for file in file_names[col]:
       filefp = fp+file
       data, fs = soundfile.read(filefp)
@@ -49,17 +58,17 @@ def create_features(file_names, file_path):
         x = 1
       label = np.array([[x] for i in range(mfcc.shape[0])]).reshape(-1,1)
       label_wn = np.array([[x] for i in range(mfcc_wn.shape[0])]).reshape(-1,1)
-      data = np.concatenate((data, data_wn))
-      label = np.concatenate((label, label_wn))
-      if flag == 0:
-        #if reading the first file
-        windows = data
-        window_labels = label
-        flag = 1
-      else:
-        windows = np.concatenate((windows, data)))
-        window_labels = np.concatenate((window_labels))
-  return windows, window_labels
+      array_w.append(mfcc)
+      array_w.append(mfcc_wn)
+      array_l.append(label)
+      array_l.append(mfcc_l)
+      count += mfcc.shape[0] + mfcc_wn.shape[0]
+    temp.append(count)
+  n_cat = temp[0]  #number of windows with class label as cat
+  n_dog = temp[1]  #number of windows with class label as dog
+  w.close()
+  l.close()
+  return n_cat, n_dog
 
       
 def create_model():
@@ -75,9 +84,12 @@ def create_model():
   return model
 
 #Model_fp ---> file path where to save the model
-def train_model(model, windows, window_labels, model_fp)
+def train_model(model, windows, window_labels, model_fp, n_cat, n_dog)
     #A sequence of 40 windows (1 second audio) is used as a data point
+    #The model performs better with more context. (Longer sequence)
     #Hence the model can classify 1 sec of audio as either cat/dog audio
+    w = tables.open_file('window.h5','r')
+    l = tables.open_file('label.h5','r')
     dog_labels = l.root.data[n_cat:,:]
     dog_data = w.root.data[n_cat:,:].reshape(20, -1)
     index = np.random.randint(0,n_dog-40,n_dog-40)
@@ -110,8 +122,23 @@ def train_model(model, windows, window_labels, model_fp)
     random.shuffle(index)
     new_dat = new_dat[index]
     new_labels = new_labels[index]
-    #t3 = time.time()
-    #print("Time to get train data set up ",t3-t1)
+
     callback = tf.keras.callbacks.EarlyStopping(monitor = 'val_loss',patience = 10)
-    model.fit(new_dat,new_labels, validation_split = 0.2, batch_size = 128, epochs = 100, callbacks = [callback])
+    history = model.fit(new_dat,new_labels, validation_split = 0.2, batch_size = 128, epochs = 100, callbacks = [callback])
     model.save(model_fp)
+    #Accuracy plot
+    plt.plot(history.history['accuracy'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
+    #Loss plot
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
+    return
