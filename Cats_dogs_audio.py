@@ -37,7 +37,7 @@ def create_features(file_names, file_path):
   for col in columns:
     count = 0
     for file in file_names[col]:
-      filefp = fp+file
+      filefp = file_path+file
       data, fs = soundfile.read(filefp)
       data = data.reshape(-1,1)
       wn = np.random.randn(len(data)).reshape(-1,1)
@@ -69,7 +69,7 @@ def create_features(file_names, file_path):
   w.close()
   l.close()
   return n_cat, n_dog
-
+n_cat, n_dog = create_features(file_names, file_path)
       
 def create_model():
   lr_schedule = tf.keras.optimizers.schedules.InverseTimeDecay(0.001, decay_steps = 25*(n_dog+n_cat-20)//128,decay_rate = 1)
@@ -84,7 +84,7 @@ def create_model():
   return model
 
 #Model_fp ---> file path where to save the model
-def train_model(model, windows, window_labels, model_fp, n_cat, n_dog)
+def train_model(model, n_cat, n_dog):
     #A sequence of 40 windows (1 second audio) is used as a data point
     #The model performs better with more context. (Longer sequence)
     #Hence the model can classify 1 sec of audio as either cat/dog audio
